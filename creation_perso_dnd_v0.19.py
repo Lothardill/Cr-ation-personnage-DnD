@@ -95,10 +95,7 @@ class Personnage:
             outils_disponibles.update(self.classes[classe_selectionnee].outils)
 
         if race_selectionnee:
-            # Ensure class and race competencies are separate
-            competences_disponibles_race = set()
-            competences_disponibles_race.update(self.races[race_selectionnee].competences)
-
+            competences_disponibles_classe.update(self.races[race_selectionnee].competences)
             outils_disponibles.update(self.races[race_selectionnee].outils)
             langues_parlees_race = self.races[race_selectionnee].langue_parlee_race.split(', ')
             for langue in langues_parlees_race:
@@ -152,49 +149,17 @@ class Personnage:
             return 3
 
     def update_display(self):
-        # Initialiser une variable pour stocker les modificateurs pour chaque caractéristique
-        self.modificateurs_pour_la_fiche_perso = {}  # Remise à zéro à chaque appel de update_display
-
-        race_selectionnee = race_combobox.get()  # Récupérer la race sélectionnée
-        if race_selectionnee == "Demi-elfe":  # Si la race est Demi-elfe
-            # Récupérer les choix personnalisés des combobox pour le Demi-elfe
-            custom_bonus_1 = choix_bonus_1_combobox.get()
-            custom_bonus_2 = choix_bonus_2_combobox.get()
-        else:
-            custom_bonus_1 = None
-            custom_bonus_2 = None
-
         for i, attribut in enumerate(attributs_list):
             valeur = self.attributs_personnage[attribut]
+            bonus = self.races[race_combobox.get()].bonus.get(attribut, 0) if race_combobox.get() else 0
+            total = valeur + bonus
+            modificateur = self.calculer_modificateur(total)
 
-            # Récupérer le bonus racial
-            bonus = self.races[race_selectionnee].bonus.get(attribut, 0) if race_selectionnee else 0
-
-            # Ajouter les bonus personnalisés (spécifique au Demi-elfe)
-            if race_selectionnee == "Demi-elfe":
-                if attribut == custom_bonus_1:
-                    bonus += 1
-                if attribut == custom_bonus_2:
-                    bonus += 1
-
-            total = valeur + bonus  # Calculer la valeur totale avec le bonus
-            modificateur = self.calculer_modificateur(total)  # Calcul du modificateur
-
-            # Stocker le modificateur dans la variable self.modifiers
-            self.modificateurs_pour_la_fiche_perso[attribut] = modificateur
-
-            # Debugging output
-            print(f"{attribut} : ({modificateur})")
-            print(self.modificateurs_pour_la_fiche_perso)
-
-            # Mettre à jour les labels avec les nouvelles valeurs
             attribut_valeur_labels[i].config(text=f"{valeur}")
             attribut_bonus_labels[i].config(text=f"{bonus:+d}")
             attribut_valeur_finale_labels[i].config(text=f"{total} ({modificateur:+d})")
 
-        # Mettre à jour les points restants
         points_label.config(text=f"Points restants: {self.points_disponibles}")
-
 
     def valider_repartition(self):
         if self.points_disponibles == 0:
@@ -306,50 +271,52 @@ class Personnage:
             combobox.set('')
 
     def update_maitrise(self):
-        # Réinitialiser le cadre de maîtrise pour tout effacer
         for widget in maitrise_frame.winfo_children():
             widget.destroy()
-
-        # Reset comboboxes for a fresh setup
+        
         self.comboboxes = []
-
-        # Get available competencies and tools based on race, class, and history
+    
         competences_disponibles_classe, competences_disponibles_historique, langues_disponibles, outils_disponibles = self.extraire_competences_et_langues(
             classe_combobox.get(), race_combobox.get(), historique_combobox.get()
-            )
+        )
 
-        # Handle race-specific logic
+        # Effacer les widgets existants
+        for widget in onglet_sorts_connus.winfo_children():
+            widget.destroy()
+
+        # Réinitialiser les comboboxes
+        self.comboboxes = []
+
+        # Compétences de la race
         race_selectionnee = race_combobox.get()
-        if race_selectionnee: 
+        if race_selectionnee:
             competences_race = self.races[race_selectionnee].competences
-            nombre_competences_race = self.races[race_selectionnee].nombre_competences_race
+            nombre_competences_race = 0
+            self.creer_menu_deroulant(competences_race, "Compétences de la race", maitrise_frame, nombre=nombre_competences_race)
 
-            # If there are race-specific competencies, create new dropdowns
-            if nombre_competences_race > 0:
-                self.creer_menu_deroulant(competences_race, "Compétences de la race", maitrise_frame, nombre=nombre_competences_race)
-
-        # Handle class competencies separately
+        # Compétences de la classe
         classe_selectionnee = classe_combobox.get()
         if classe_selectionnee:
             nombre_de_competence = self.classes[classe_selectionnee].nombre_de_competence
-            competences_classe = list(self.classes[classe_selectionnee].competences)  # Utiliser uniquement les compétences de la classe
+            competences_classe = list(competences_disponibles_classe)
             self.creer_menu_deroulant(competences_classe, "Compétences de la classe", maitrise_frame, nombre=nombre_de_competence)
 
-        # Handle historical competencies separately
+        # Compétences de l'historique
         historique_selectionne = historique_combobox.get()
         if historique_selectionne:
             nombre_de_competence_historique = self.historiques[historique_selectionne].nombre_de_competence
             competences_historique = list(competences_disponibles_historique)
             self.creer_menu_deroulant(competences_historique, "Compétences de l'historique", maitrise_frame, nombre=nombre_de_competence_historique)
 
-        # Outils handling (Race, Class, Historique)
+        # Outils de la race
         if race_selectionnee:
             outils_race = self.races[race_selectionnee].outils
             self.creer_menu_deroulant(outils_race, "Outils de la race", maitrise_frame, 1)
 
-        if classe_selectionnee:
-            self.creer_menu_deroulant(self.classes[classe_selectionnee].outils, "Outils de la classe", maitrise_frame, 1)
+        # Outils de la classe
+        self.creer_menu_deroulant(self.classes[classe_selectionnee].outils, "Outils de la classe", maitrise_frame, nombre=1)
 
+        # Outils de l'historique
         if historique_selectionne:
             outils_historiques = self.historiques[historique_selectionne].outils
             choix_outils_historiques = self.historiques[historique_selectionne].choix_outils
@@ -361,15 +328,41 @@ class Personnage:
                     formatted_outils_historiques = [self.format_value(opt) for opt in sorted(outils_historiques)]
                     combobox_outils_historique = ttk.Combobox(outils_historiques_frame, values=formatted_outils_historiques, state="readonly")
                     combobox_outils_historique.pack(side=tk.LEFT, padx=5)
+                    combobox_outils_historique.bind("<<ComboboxSelected>>", lambda event: [self.update_selected_values()])
                     self.comboboxes.append((combobox_outils_historique, "Outils de l'historique"))
-
                 if choix_outils_historiques:
                     formatted_choix_outils_historiques = [self.format_value(opt) for opt in sorted(choix_outils_historiques)]
                     combobox_choix_outils_historiques = ttk.Combobox(outils_historiques_frame, values=formatted_choix_outils_historiques, state="readonly")
                     combobox_choix_outils_historiques.pack(side=tk.LEFT, padx=5)
+                    combobox_choix_outils_historiques.bind("<<ComboboxSelected>>", lambda event: [self.update_selected_values()])
                     self.comboboxes.append((combobox_choix_outils_historiques, "Choix d'outils de l'historique"))
+
+        # Langues de la race
+        if race_selectionnee:
+            langues_parlees_race = self.races[race_selectionnee].langue_parlee_race.split(', ')
+            if langues_parlees_race or self.races[race_selectionnee].nombre_de_langue > 0:
+                tk.Label(maitrise_frame, text="Langues de la race", font=('Arial', 10, 'bold')).pack(anchor="w")
+                langues_race_frame = tk.Frame(maitrise_frame)
+                langues_race_frame.pack(anchor="w", pady=5)
+                for langue in langues_parlees_race:
+                    tk.Label(langues_race_frame, text=langue, font=('Arial', 10)).pack(side=tk.LEFT, padx=5)
+                all_langues = sorted(langues_standard + langues_exotiques)
+                formatted_all_langues = [self.format_value(opt) for opt in all_langues]
+                for _ in range(self.races[race_selectionnee].nombre_de_langue):
+                    combobox_langues_supplementaires_race = ttk.Combobox(langues_race_frame, values=formatted_all_langues, state="readonly")
+                    combobox_langues_supplementaires_race.pack(side=tk.LEFT, padx=5)
+                    combobox_langues_supplementaires_race.bind("<<ComboboxSelected>>", lambda event: [self.update_selected_values()])
+                    self.comboboxes.append((combobox_langues_supplementaires_race, "Langues de la race"))
+
+        # Langues de l'historique
+        if historique_selectionne:
+            nombre_de_langue_historique = self.historiques[historique_selectionne].nombre_de_langue_historique
+            if nombre_de_langue_historique > 0:
+                self.creer_menu_deroulant(langues_standard + langues_exotiques, "Langues de l'historique", maitrise_frame, nombre=nombre_de_langue_historique)
+ 
+        self.update_comboboxes()
         
-        race_combobox.bind("<<ComboboxSelected>>", lambda event: on_race_selected())
+
         
 # Données de jeu
 attributs_list = ['Force', 'Dextérité', 'Constitution', 'Intelligence', 'Sagesse', 'Charisme']
@@ -1168,7 +1161,7 @@ races = {
         ],
         bonus={'Charisme':2},
         choix_bonus=2,
-        competences=['Acrobaties', 'Arcanes', 'Athlétisme', 'Discrétion', 'Dressage', 'Escamotage', 'Histoire', 'Intimidation', 'Investigation', 'Médecine', 'Nature', 'Perception', 'Perspicacité', 'Persuasion', 'Religion', 'Représentation', 'Survie', 'Tromperie'],
+        competences=competences_completes,
         nombre_competences_race=2,
         outils=[],
         sort_race=[],
@@ -1458,26 +1451,21 @@ classe_combobox.bind("<<ComboboxSelected>>", lambda event: [
     update_options()
 ])
 
-historique_combobox.bind("<<ComboboxSelected>>", lambda event: [
-    afficher_details_historique(),
-    personnage.update_maitrise()  # Met à jour les compétences/outils de l'historique dans l'onglet Maîtrise
+race_combobox.bind("<<ComboboxSelected>>", lambda event: [
+    personnage.reset_selected_values(),
+    personnage.reset_comboboxes(),
+    afficher_details_race(),
+    personnage.update_display(),
+    personnage.update_maitrise()  # Réinitialise l'onglet Maîtrise
 ])
 
-def on_race_selected():
-    # Mettre à jour le bonus racial
-    update_bonus_racial()
-    # Réinitialiser les valeurs sélectionnées et les comboboxes
-    personnage.reset_selected_values()
-    personnage.reset_comboboxes()
-    # Afficher les détails de la race
-    afficher_details_race()
-    # Mettre à jour les compétences et les maîtrises
-    personnage.update_maitrise()
-    personnage.update_display()
+historique_combobox.bind("<<ComboboxSelected>>", lambda event: [
+    personnage.reset_selected_values(),
+    personnage.reset_comboboxes(),
+    afficher_details_historique(),
+    personnage.update_maitrise()  # Réinitialise l'onglet Maîtrise
+])
 
-
-
-race_combobox.bind("<<ComboboxSelected>>", lambda event: on_race_selected())
 
 # Widgets pour l'onglet Caractéristiques
 caracteristiques_labels = []
@@ -1488,37 +1476,82 @@ attribut_valeur_finale_labels = []
 titre_label = tk.Label(onglet_caracteristiques, text="Répartition des caractéristiques", font=('Arial', 12, 'bold'))
 titre_label.grid(row=0, column=0, columnspan=6, pady=4)
 
-
+# Variable global pour tracker le tableau
+table_frame = None
 
 # Fonction pour mettre à jour les bonus raciaux
 def update_bonus_racial():
+    global table_frame
     race_selectionnee = race_combobox.get()
     if race_selectionnee:
         race_info = personnage.races[race_selectionnee]
         
-        # Récupérer les bonus raciaux de la race sélectionnée
+        # Utilisation de la notation par point pour accéder aux attributs de l'objet Race
         bonus = race_info.bonus
 
-        # Mettre à jour les labels des bonus raciaux pour chaque attribut
         for i, attribut in enumerate(attributs_list):
             bonus_racial = bonus.get(attribut, 0)
             if bonus_racial != 0:
-                # Affiche un "+" devant les bonus positifs
                 attribut_bonus_labels[i].config(text=f"+{bonus_racial}" if bonus_racial > 0 else str(bonus_racial))
             else:
-                attribut_bonus_labels[i].config(text="0")  # Met "0" si pas de bonus
+                attribut_bonus_labels[i].config(text="0")  # Mettre "0" si pas de bonus
 
-        # Gestion des bonus supplémentaires pour certaines races (ex: Demi-elfe)
+        # Afficher ou cacher le cadre pour les bonus supplémentaires (Demi-elfe)
         if race_info.choix_bonus > 0:
-            # Si la race a un choix de bonus supplémentaire, afficher le cadre correspondant
-            choix_frame.grid(row=21, column=0, columnspan=6, pady=10)
+            choix_frame.grid(row=21, column=0, columnspan=6, pady=10)  # Réaffiche avec grid
         else:
-            # Cacher le cadre des bonus supplémentaires s'il n'y en a pas
-            choix_frame.grid_remove()
+            choix_frame.grid_remove()  # Utilisez grid_remove pour le cacher
+            
+        # Vérification si la race sélectionnée est "Drakéide" pour afficher l'ascendance draconique
+        if race_selectionnee == "Drakéide":
+            # Supprimer le tableau précédent s'il existe
+            if table_frame is not None:
+                table_frame.destroy()
+
+            # Créez un tableau dans l'interface
+            table_frame = tk.Frame(onglet_race)
+            table_frame.pack(pady=5)
+
+            # En-tête du tableau
+            header_labels = ["Dragon", "Type de dégâts", "Souffle", "Résistance"]
+            for i, header in enumerate(header_labels):
+                tk.Label(table_frame, text=header, font=('Arial', 10, 'bold'), borderwidth=1, relief="solid", padx=10, pady=5).grid(row=0, column=i, sticky="ew")
+
+            # Données du tableau
+            dragon_data = [
+                ("Blanc", "Froid", "Cône de 4,50 m (JdS de Con.)", "Froid"),
+                ("Bleu", "Foudre", "Ligne de 1,50 x 9 m (JdS de Dex.)", "Foudre"),
+                ("Noir", "Acide", "Ligne de 1,50 x 9 m (JdS de Dex.)", "Acide"),
+                ("Rouge", "Feu", "Cône de 4,50 m (JdS de Dex.)", "Feu"),
+                ("Vert", "Poison", "Cône de 4,50 m (JdS de Con.)", "Poison"),
+                ("Airain", "Feu", "Ligne de 1,50 x 9 m (JdS de Dex.)", "Feu"),
+                ("Argent", "Froid", "Cône de 4,50 m (JdS de Con.)", "Froid"),
+                ("Bronze", "Foudre", "Ligne de 1,50 x 9 m (JdS de Dex.)", "Foudre"),
+                ("Cuivre", "Acide", "Ligne de 1,50 x 9 m (JdS de Dex.)", "Acide"),
+                ("Or", "Feu", "Cône de 4,50 m (JdS de Dex.)", "Feu"),
+                ]
+
+            # Ajout des données dans le tableau
+            for row_idx, row_data in enumerate(dragon_data, start=1):
+                for col_idx, value in enumerate(row_data):
+                    tk.Label(table_frame, text=value, borderwidth=1, relief="solid", padx=10, pady=5).grid(row=row_idx, column=col_idx, sticky="ew")
+            ascendance_label.pack(pady=10)
+            ascendance_combobox.pack(pady=5)
+        else:
+            # Cacher le tableau si ce n'est pas "Drakéide"
+            if table_frame is not None:
+                table_frame.destroy()
+                table_frame = None
+            ascendance_label.pack_forget()
+            ascendance_combobox.pack_forget()
+            
+            
+        # Afficher la description de la race sélectionnée
+        details_str = "\n".join(race_info.details)
+        race_details_label.config(text=f"{race_info.description}\n\nDétails:\n{details_str}")
 
         # Mettre à jour les valeurs finales des caractéristiques
         update_valeur_finale()
-        
 
 # Liste des attributs restreints pour les choix bonus
 choix_possibles = ["Force", "Dextérité", "Constitution", "Intelligence", "Sagesse"]
@@ -1544,13 +1577,12 @@ def update_choix_bonus():
         choix_bonus_2_combobox.set('')
 
 
-# Fonction pour gérer la sélection des bonus supplémentaires (spécifique au Demi-elfe)
+# Fonction pour gérer la sélection des bonus supplémentaires
 def update_custom_bonus_racial():
     race_selectionnee = race_combobox.get()
-
-    if race_selectionnee == "Demi-elfe":  # Vérifier que la race sélectionnée est bien Demi-elfe
+    if race_selectionnee:
         race_info = personnage.races[race_selectionnee]
-        bonus = race_info.bonus.copy()  # Copier le bonus racial de base
+        bonus = race_info.bonus.copy()  # Copie du bonus existant pour ne pas modifier l'original
 
         # Ajouter les bonus personnalisés choisis par l'utilisateur
         custom_bonus_1 = choix_bonus_1_combobox.get()
@@ -1561,18 +1593,19 @@ def update_custom_bonus_racial():
         if custom_bonus_2:
             bonus[custom_bonus_2] = bonus.get(custom_bonus_2, 0) + 1
 
-        # Mettre à jour les labels pour afficher les bonus raciaux (incluant les bonus personnalisés)
+        # Mettre à jour l'affichage des bonus raciaux
         for i, attribut in enumerate(attributs_list):
             bonus_racial = bonus.get(attribut, 0)
-            attribut_bonus_labels[i].config(text=f"+{bonus_racial}" if bonus_racial > 0 else "0")
+            if bonus_racial != 0:
+                attribut_bonus_labels[i].config(text=f"+{bonus_racial}" if bonus_racial > 0 else str(bonus_racial))
+            else:
+                attribut_bonus_labels[i].config(text="0")  # Mettre "0" si pas de bonus
 
         # Mettre à jour les valeurs finales des caractéristiques
-        personnage.update_display()  # Appeler la méthode de mise à jour de l'affichage des valeurs
+        update_valeur_finale()
 
     # Mettre à jour les combobox après sélection
     update_choix_bonus()
-    
-    
 
 # Appel initial pour afficher les valeurs finales correctes
 def update_valeur_finale():
@@ -1648,7 +1681,10 @@ choix_bonus_1_combobox.bind("<<ComboboxSelected>>", lambda e: update_custom_bonu
 choix_bonus_2_combobox.bind("<<ComboboxSelected>>", lambda e: update_custom_bonus_racial())
 
 # Appeler update_bonus_racial pour initialiser correctement lors du lancement
-personnage.update_display()
+update_bonus_racial()
+
+# Bouton de validation
+tk.Button(onglet_caracteristiques, text="Valider répartition", command=personnage.valider_repartition).grid(row=20, column=2, columnspan=2, pady=10)
 
 # Appeler update_display pour initialiser les valeurs à l'affichage
 personnage.update_display()
@@ -1669,9 +1705,6 @@ def enregistrer_personnage():
 enregistrer_button = tk.Button(fenetre, text="Enregistrer le personnage", command=enregistrer_personnage)
 enregistrer_button.pack(pady=10)
 
-# Variable global pour tracker le tableau
-table_frame = None
-
 # Fonctions pour afficher les détails de la classe
 def afficher_details_classe():
     classe_selectionnee = classe_combobox.get()
@@ -1683,103 +1716,13 @@ def afficher_details_classe():
         capacites_str = '\n'.join(capacites)
         classe_details_label.config(text=f'Description:\n{description}\n\nDétails de la Classe:\n{details_str}\n\nCapacités de la Classe:\n{capacites_str}')
 
-
-
-# Variables globales pour les éléments spécifiques à Drakéide
-ascendance_label = None
-ascendance_combobox = None
-tableau_frame = None  # Utiliser tableau_frame au lieu de tableau_label
-
-
-def afficher_tableau_draconic():
-    global tableau_frame
-    
-    # Vérifier si le tableau existe déjà, et le supprimer s'il existe
-    if tableau_frame:
-        tableau_frame.destroy()
-
-    # Créer le frame qui contiendra le tableau
-    tableau_frame = tk.Frame(onglet_race)
-    tableau_frame.pack(pady=10)
-
-    # Créer un tableau avec Treeview
-    colonnes = ("Dragon", "Type de dégâts", "Souffle", "Résistance")
-    tableau = ttk.Treeview(tableau_frame, columns=colonnes, show='headings', height=10)
-
-    # Configurer les en-têtes du tableau
-    tableau.heading("Dragon", text="Dragon")
-    tableau.heading("Type de dégâts", text="Type de dégâts")
-    tableau.heading("Souffle", text="Souffle")
-    tableau.heading("Résistance", text="Résistance")
-
-    # Définir la largeur des colonnes
-    tableau.column("Dragon", width=100, anchor="center")
-    tableau.column("Type de dégâts", width=100, anchor="center")
-    tableau.column("Souffle", width=200, anchor="center")
-    tableau.column("Résistance", width=100, anchor="center")
-
-    # Ajouter les données
-    data = [
-        ("Blanc", "Froid", "Cône de 4,50 m (JdS de Con.)", "Froid"),
-        ("Bleu", "Foudre", "Ligne de 1,50 x 9 m (JdS de Dex.)", "Foudre"),
-        ("Noir", "Acide", "Ligne de 1,50 x 9 m (JdS de Dex.)", "Acide"),
-        ("Rouge", "Feu", "Cône de 4,50 m (JdS de Dex.)", "Feu"),
-        ("Vert", "Poison", "Cône de 4,50 m (JdS de Con.)", "Poison"),
-        ("Airain", "Feu", "Ligne de 1,50 x 9 m (JdS de Dex.)", "Feu"),
-        ("Argent", "Froid", "Cône de 4,50 m (JdS de Con.)", "Froid"),
-        ("Bronze", "Foudre", "Ligne de 1,50 x 9 m (JdS de Dex.)", "Foudre"),
-        ("Cuivre", "Acide", "Ligne de 1,50 x 9 m (JdS de Dex.)", "Acide"),
-        ("Or", "Feu", "Cône de 4,50 m (JdS de Dex.)", "Feu")
-    ]
-
-    # Insérer les lignes de données dans le tableau
-    for row in data:
-        tableau.insert('', tk.END, values=row)
-
-    # Afficher le tableau
-    tableau.pack(fill="both", expand=True)
-
-
 # Fonctions pour afficher les détails de la race
 def afficher_details_race():
-    global ascendance_label, ascendance_combobox, tableau_frame
-    
     race_selectionnee = race_combobox.get()
-
-    # Effacer les éléments spécifiques à Drakéide s'ils existent
-    if ascendance_label:
-        ascendance_label.pack_forget()
-        ascendance_label = None
-    if ascendance_combobox:
-        ascendance_combobox.pack_forget()
-        ascendance_combobox = None
-    if tableau_frame:
-        tableau_frame.destroy()
-        tableau_frame = None
-
-    if race_selectionnee:
-        race_info = races[race_selectionnee]
-
-        # Afficher la description et les détails de la race
-        description = race_info.description
-        details = '\n'.join(race_info.details)
-        race_details_label.config(text=f'Description:\n{description}\n\nDétails de la Race:\n{details}')
-
-        # Si la race sélectionnée est Drakéide, afficher l'ascendance draconique et le tableau des résistances
-        if race_selectionnee == 'Drakéide':
-            # Ajouter le titre pour l'ascendance draconique
-            ascendance_label = tk.Label(onglet_race, text="Choisissez votre ascendance draconique :", font=('Arial', 10, 'bold'))
-            ascendance_label.pack(anchor="center", pady=10)
-
-            # Créer un menu déroulant pour sélectionner l'ascendance draconique
-            ascendance_options = ["Blanc", "Bleu", "Noir", "Rouge", "Vert", "Airain", "Argent", "Bronze", "Cuivre", "Or"]
-            ascendance_combobox = ttk.Combobox(onglet_race, values=ascendance_options, state="readonly")
-            ascendance_combobox.pack(anchor="center", padx=5, pady=5)
-
-            # Afficher le tableau des dragons
-            afficher_tableau_draconic()
-            
-            
+    description = races[race_selectionnee].description
+    details = races[race_selectionnee].details
+    details_str = '\n'.join(details)
+    race_details_label.config(text=f'Description:\n{description}\n\nDétails de la Race:\n{details_str}')
 
 # Fonction pour lancer un dé à 100 faces et retourner une babiole
 def tirer_babiole():

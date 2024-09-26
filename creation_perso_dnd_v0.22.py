@@ -10,21 +10,30 @@ class StyleDeCombat:
         self.description = description
 
 class Classe:
-    def __init__(self, nom, description, details, capacites, outils, nombre_de_competence, competences, sort_mineur_classe, nombre_sort_mineur_classe, sort_niveau_un_classe, nombre_sort_niveau_un_classe, styles_de_combat, argent_classe, packs):
+    def __init__(self, nom, description, details, capacites, nombre_outils, outils, nombre_de_competence, competences,
+                 sort_mineur_classe, nombre_sort_mineur_classe, sort_niveau_un_classe, nombre_sort_niveau_un_classe,
+                 styles_de_combat, argent_classe, packs, dd_sauvegarde_sorts=None, modificateur_attaque_sort=None,
+                 ca=None, jets_de_sauvegarde=None, pv=None):
         self.nom = nom
         self.description = description
         self.details = details
         self.capacites = capacites
+        self.nombre_outils = nombre_outils
         self.outils = outils
         self.nombre_de_competence = nombre_de_competence
         self.competences = competences
         self.sort_mineur_classe = sort_mineur_classe
-        self.nombre_sort_mineur_classe=nombre_sort_mineur_classe
-        self.sort_niveau_un_classe=sort_niveau_un_classe
-        self.nombre_sort_niveau_un_classe= nombre_sort_niveau_un_classe
+        self.nombre_sort_mineur_classe = nombre_sort_mineur_classe
+        self.sort_niveau_un_classe = sort_niveau_un_classe
+        self.nombre_sort_niveau_un_classe = nombre_sort_niveau_un_classe
         self.styles_de_combat = styles_de_combat
         self.argent_classe = argent_classe
         self.packs = packs
+        self.dd_sauvegarde_sorts = dd_sauvegarde_sorts if dd_sauvegarde_sorts is not None else "Pas de DD"
+        self.modificateur_attaque_sort = modificateur_attaque_sort
+        self.ca = ca if ca is not None else "10 + modificateur de Dextérité"
+        self.jets_de_sauvegarde = jets_de_sauvegarde if jets_de_sauvegarde is not None else "Aucun"
+        self.pv = pv if pv is not None else 8
         
     def calculer_argent(self):
         des, multiplicateur = map(int, self.argent_classe.split('d4 x '))
@@ -310,45 +319,53 @@ class Personnage:
         for widget in maitrise_frame.winfo_children():
             widget.destroy()
 
-        # Reset comboboxes for a fresh setup
+        # Reset comboboxes 
         self.comboboxes = []
 
-        # Get available competencies and tools based on race, class, and history
+        # Récupérer les compétences et outils disponibles en fonction de la classe, de la race et de l'historique
         competences_disponibles_classe, competences_disponibles_historique, langues_disponibles, outils_disponibles = self.extraire_competences_et_langues(
             classe_combobox.get(), race_combobox.get(), historique_combobox.get()
             )
 
-        # Handle race-specific logic
+        # Logique spécifique aux races
         race_selectionnee = race_combobox.get()
         if race_selectionnee: 
             competences_race = self.races[race_selectionnee].competences
             nombre_competences_race = self.races[race_selectionnee].nombre_competences_race
 
-            # If there are race-specific competencies, create new dropdowns
+            # S'il y a des compétences spécifique aux races, créer des nouveaux menus
             if nombre_competences_race > 0:
                 self.creer_menu_deroulant(competences_race, "Compétences de la race", maitrise_frame, nombre=nombre_competences_race)
 
-        # Handle class competencies separately
+        # Logique des compétences de classes
         classe_selectionnee = classe_combobox.get()
         if classe_selectionnee:
             nombre_de_competence = self.classes[classe_selectionnee].nombre_de_competence
-            competences_classe = list(self.classes[classe_selectionnee].competences)  # Utiliser uniquement les compétences de la classe
+            competences_classe = list(self.classes[classe_selectionnee].competences.split(', '))  # Utiliser uniquement les compétences de la classe
             self.creer_menu_deroulant(competences_classe, "Compétences de la classe", maitrise_frame, nombre=nombre_de_competence)
 
-        # Handle historical competencies separately
+        # Logique des compétences d'historique
         historique_selectionne = historique_combobox.get()
         if historique_selectionne:
             nombre_de_competence_historique = self.historiques[historique_selectionne].nombre_de_competence
             competences_historique = list(competences_disponibles_historique)
             self.creer_menu_deroulant(competences_historique, "Compétences de l'historique", maitrise_frame, nombre=nombre_de_competence_historique)
 
-        # Outils handling (Race, Class, Historique)
+        # Logiques de maîtrise d'outils (Race, Classe, Historique)
         if race_selectionnee:
             outils_race = self.races[race_selectionnee].outils
             self.creer_menu_deroulant(outils_race, "Outils de la race", maitrise_frame, 1)
-
+        
+        classe_selectionnee = classe_combobox.get()
         if classe_selectionnee:
-            self.creer_menu_deroulant(self.classes[classe_selectionnee].outils, "Outils de la classe", maitrise_frame, 1)
+            nombre_outils_classe = self.classes[classe_selectionnee].nombre_outils
+            if nombre_outils_classe == 1:
+                self.creer_menu_deroulant(self.classes[classe_selectionnee].outils, "Outils de la classe", maitrise_frame, 1)
+                
+            # Créer un menu déroulant pour chaque outil (en fonction de nombre_outils)
+            if nombre_outils_classe > 1:
+                outils_classe = list(self.classes[classe_selectionnee].outils.split(', '))
+                self.creer_menu_deroulant(outils_classe, "Outils de la classe", maitrise_frame, nombre=nombre_outils_classe)
 
         if historique_selectionne:
             outils_historiques = self.historiques[historique_selectionne].outils
@@ -855,6 +872,182 @@ description_style_de_combat = {
 styles_de_combat = [StyleDeCombat(nom, description) for nom, description in description_style_de_combat.items()]
 
 classes = {
+    'Barbare': Classe(
+        nom='Barbare',
+        description='Pour un barbare, la civilisation n\'est pas une vertu, c\'est un signe de faiblesse. Les forts assument leurs instincts naturels, leur physique primitif et leur rage féroce. Les barbares ne sont pas à l\'aise derrière des murs ou entourés par la foule. Ils prospèrent sur les étendues sauvages de leurs terres natales.',
+        details=[
+            'DV. 1d12',
+            'Armures. armures légères, armures intermédiaires, boucliers',
+            'Armes. Armes courantes, armes de guerre',
+            'Jets de sauvegarde. Force, Constitution',
+            'Choix de 2 compétences parmi Athlétisme, Dressage, Intimidation, Nature, Perception et Survie'
+        ],
+        capacites=[
+            """
+Rage : En combat, vous vous battez avec une férocité bestiale. Durant votre tour, vous pouvez entrer en rage en utilisant une action bonus. En rage, vous gagnez les bénéfices suivants si vous ne portez pas d'armure lourde :
+    - Vous avez un avantage aux jets de Force et aux jets de sauvegarde de Force.
+    - Quand vous effectuez une attaque au corps à corps avec une arme utilisant la Force, vous gagnez un bonus aux jets de dégâts de +2. Vous pouvez vous mettre en rage 2 fois par long repos. 
+    - Vous avez la résistance aux dégâts contondants, perforants et tranchants.
+    - Si vous êtes capable de lancer des sorts, vous ne pouvez les lancer ou vous concentrer sur eux pour toute la durée de la rage.
+Votre rage dure 1 minute. Elle finit prématurément si vous devenez inconscient, ou si votre tour se termine et que vous n'avez ni attaqué une créature hostile, ni subi des dégâts, depuis votre précédent tour. Vous pouvez également mettre fin à votre rage durant votre tour par une action bonus. Vous récupérez les utilisations de rage dépensées après avoir terminé un repos long.
+
+Défense sans armure : Tant que vous ne portez pas d'armure, votre classe d'armure est égale à 10 + votre modificateur de Dextérité + votre modificateur de Constitution. Vous pouvez utiliser un bouclier et continuer de profiter de cette capacité.
+            """
+        ],
+        nombre_outils=0,
+        outils=[],
+        nombre_de_competence=2,
+        competences='Athlétisme, Dressage, Intimidation, Nature, Perception , Survie',
+        sort_mineur_classe=[],
+        nombre_sort_mineur_classe=0,
+        sort_niveau_un_classe=[],
+        nombre_sort_niveau_un_classe=0,
+        styles_de_combat=[],
+        argent_classe='2d4 x 10',
+        packs={'Pack (a)': ['Une hache à deux mains', 'Deux hachettes', 'Quatre javelines', 'Sac d\'explorateur'],
+               'Pack (b)': ['Une arme de guerre de corps à corps au choix', 'Une arme courante au choix', 'Quatre javelines', 'Sac d\'explorateur']},
+        ca='10 + modificateur de Dextérité + modificateur de Constitution',
+        jets_de_sauvegarde='Force, Constitution',
+        pv=12
+    ),
+    'Barde': Classe(
+        nom='Barde',
+        description='Fredonnant alors qu’elle passe ses doigts sur un ancien monument au cœur de ruines depuis longtemps oubliées, une demi-elfe vêtue de cuir robuste sent le savoir, invoqué par la magie de son chant, bondir dans son esprit. La plus grande force du barde est son incontestable polyvalence. De nombreux bardes préfèrent demeurer en retrait lors d’un combat, utilisant plutôt la magie pour inspirer leurs alliés et gêner leurs ennemis.',
+        details=[
+            'DV. 1d8',
+            'Armures. armures légères',
+            'Armes. armes courantes, arbalète de poing, épée longue, épée courte, rapière',
+            'Jets de sauvegarde. Dextérité, Charisme',
+            'Choix de 3 compétences parmi toutes celles disponibles'
+        ],
+        capacites=[
+            """
+Inspiration bardique : Vous pouvez inspirer les autres en maniant les mots ou la musique. Pour ce faire, utilisez une action bonus à votre tour pour choisir une créature autre que vous-même dans un rayon de 18 mètres autour de vous et qui peut vous entendre. Cette créature gagne un dé d'Inspiration bardique (d6). Une fois dans les 10 minutes suivantes, la créature peut lancer le dé et ajouter le nombre obtenu à un jet de caractéristique, d'attaque ou de sauvegarde qu'elle vient de faire. La créature peut attendre de voir le résultat de jet de caractéristique, d'attaque ou de sauvegarde avant de décider d'appliquer le dé d'Inspiration bardique, mais elle doit se décider avant que le MD ne dise si le jet est un succès ou un échec. Une fois le dé d'Inspiration bardique lancé, il est consommé. Une créature ne peut avoir qu'un seul dé d'Inspiration bardique à la fois.
+    Vous pouvez utiliser cette capacité un nombre de fois égal à votre modificateur de Charisme (minimum 1). Vous regagnez vos dés d'Inspiration bardique après avoir terminé un repos long.
+            """
+        ],
+        nombre_outils=3,
+        outils='Chalemie, Cor, Cornemuse, Flûte,  Flûte de pan, Luth, Lyre, Tambour, Tympanon, Viole',
+        nombre_de_competence=3,
+        competences='Acrobaties, Arcanenes, Athlétisme, Discrétion, Dressage, Escamotage, Histoire, Intimidation, Investigation, Médecine, Nature, Perception, Perspicacité, Persuasion, Religion, Représentation, Survie, Tromperie',
+        sort_mineur_classe=['Amis', 'Coup au but', 'Coup de tonnerre', 'Illusion mineure', 'Lumière', 'Lumières dansantes', 'Main de mage', 'Message', 'Moquerie cruelle', 'Prestidigitation', 'Protection contre les armes', 'Réparation'],
+        nombre_sort_mineur_classe=2,
+        sort_niveau_un_classe=['Amitié avec les animaux', 'Barbes argentées', 'Charme-personne', 'Communication avec les animaux', 'Compréhension des langues', 'Déguisement', 'Détection de la magie', 'Feuille morte', 'Fléau', 'Fou rire de Tasha', 'Grande foulée', 'Héroïsme', 'Identification', 'Image silencieuse', 'Lueurs féeriques', 'Mot de guérison', 'Murmures dissonants', 'Secousse sismique', 'Serviteur invisible', 'Soins', 'Sommeil', 'Texte illusoire', 'Vague tonnante'],
+        nombre_sort_niveau_un_classe=4,
+        styles_de_combat=[],
+        argent_classe='5d4 x 10',
+        packs={'Pack (a)': ['Une rapière', 'Un luth', 'Armure de cuir', 'Une dague', 'Sac de diplomate'],
+               'Pack (b)': ['Un instrument de musique au choix', 'Une arme courante au choix', 'Armure de cuir', 'Une dague', 'Sac d\'artiste']},
+        dd_sauvegarde_sorts='8 + bonus de maîtrise + modificateur de Charisme',
+        modificateur_attaque_sort='bonus de maîtrise + modificateur de Charisme',
+        ca='10 + modificateur de Dextérité',
+        jets_de_sauvegarde='Dextérité, Charisme',
+        pv=8
+    ),
+    'Clerc': Classe(
+        nom='Clerc',
+        description='Les bras et les yeux levés en direction du soleil, une prière sur les lèvres, un elfe commence à briller d\'une lumière intérieure qui s\'en va guérir ses compagnons usés par le combat. Les clercs combinent la magie utile de guérison et d\'inspiration de leurs alliés avec des sorts néfastes ou gênants pour les adversaires.',
+        details=[
+            'DV. 1d8',
+            'Armures. armures légères et intermédiaires, boucliers',
+            'Armes. armes courantes',
+            'Jets de sauvegarde. Sagesse, Charisme',
+            'Choix de 2 compétences parmi Histoire, Intuition, Médecine, Persuasion et Religion'
+        ],
+        capacites=[
+            """
+Préparer et lancer des sorts : Pour lancer un de ces sorts, vous devez dépenser un emplacement du niveau du sort ou supérieur. Vous regagnez tous les emplacements de sorts dépensés lorsque vous terminez un repos long. Vous pouvez lancez deux sorts de niveaux 1 par repos long. Vous devez préparer la liste des sorts de clerc qui vous sont disponibles pour les lancer. Pour ce faire, choisissez un nombre de sorts de clerc égal à votre modificateur de Sagesse + votre niveau de clerc (minimum un sort). Vous pouvez modifier votre liste de sorts préparés lorsque vous terminez un repos long. Préparer une nouvelle liste de sorts de clerc nécessite du temps pour prier et méditer : au moins 1 minute par niveau de sort pour chaque sort sur votre liste.
+            """
+        ],
+        nombre_outils=0,
+        outils=[],
+        nombre_de_competence=2,
+        competences='Histoire, Intuition, Médecine, Persuasion, Religion',
+        sort_mineur_classe=['Assistance', 'Flamme sacrée', 'Glas', 'Lumière', 'Mot de radiance', 'Réparation', 'Résistance', 'Stabilisation', 'Thaumaturgie'],
+        nombre_sort_mineur_classe=2,
+        sort_niveau_un_classe=['Bénédiction', 'Blessure', 'Bouclier de la foi', 'Cérémonie', 'Création ou destruction d\'eau', 'Détection de la magie', 'Détection du mal et du bien', 'Détection du poison et des maladies', 'Éclair traçant ', 'Fléau', 'Injonction', 'Mot de guérison', 'Protection contre le mal et le bien', 'Purification de nourriture et d\'eau', 'Sanctuaire', 'Soins'],
+        nombre_sort_niveau_un_classe="variable",
+        styles_de_combat=[],
+        argent_classe='5d4 x 10',
+        packs={'Pack (a)': ['Une masse d\'arme', 'Une armure d\'écaille', 'Une arbalète légère et 20 carreaux', 'un bouclier', 'Un symbole sacré', 'Sac  d\'ecclésiastique'],
+               'Pack (b)': ['Un marteau de guerre', 'Une cotte de maille', 'Une arme courante au choix', 'un bouclier', 'un symbole sacré', 'Sac d\'explorateur']},
+        dd_sauvegarde_sorts='8 + bonus de maîtrise + modificateur de Sagesse',
+        modificateur_attaque_sort='bonus de maîtrise + modificateur de Sagesse',
+        ca='10 + modificateur de Dextérité',
+        jets_de_sauvegarde='Sagesse, Charisme',
+        pv=8
+    ),
+    'Druide': Classe(
+        nom='Druide',
+        description='Que ce soit en faisant appel aux forces élémentaires naturelles ou en imitant les créatures du monde animal, les druides sont des incarnations de la force, de la ruse, et de la colère de la nature. Ils ne se proclament pas maîtres de la nature. Ils se voient plutôt comme des extensions de la volonté indomptable de la nature.',
+        details=[
+            'DV. 1d8',
+            'Armures. armures légères et intermédiaires, boucliers (un druide n\'utilisera pas d\'armure ou de bouclier en métal)',
+            'Armes. gourdin, dague, fléchette, javeline, masse d\'armes, bâton, cimeterre, fronde, serpe, lance',
+            'Jets de sauvegarde. Sagesse, Intelligence',
+            'Choix de 2 compétences parmi Arcanes, Dressage, Intuition, Médecine, Nature, Perception, Survie et Religion'
+        ],
+        capacites=[
+            """
+Druidique
+    Vous connaissez le druidique, le langage secret des druides. Vous pouvez parler cette langue et l'utiliser pour laisser des messages secrets. Vous, et les autres personnes connaissant ce langage, remarquez automatiquement un tel message. Les autres personnages remarquent la présence du message s'ils réussissent un jet de Sagesse (Perception) DD 15 mais ne peuvent pas le déchiffrer sans utiliser la magie.
+
+Incantation
+    Puisant dans l'essence divine de la nature elle-même, vous pouvez lancer des sorts pour modeler cette essence selon votre volonté. Vous devez préparer la liste des sorts de druide qui vous sont disponibles pour les lancer. Pour ce faire, choisissez un nombre de sorts de druide égal à votre modificateur de Sagesse + votre niveau de druide.
+            """
+        ],
+        nombre_outils=1,
+        outils=['Kit d\'herboriste'],
+        nombre_de_competence=2,
+        competences='Arcanes, Dressage, Intuition, Médecine, Nature, Perception, Survie, Religion',
+        sort_mineur_classe=['Assistance, Bouffée de poison, Contrôle des flammes, Coup de tonnerre, Druidisme, Embrasement, Façonnage de l\'eau, Façonnage de la terre, Flammes, Fouet épineux, Gelure, Gourdin magique, Infestation, Pierre magique, Réparation, Résistance, Saute de vent, Sauvagerie primitive'],
+        nombre_sort_mineur_classe=2,
+        sort_niveau_un_classe=['Absorption des éléments, Amitié avec les animaux, Baies nourricières, Charme-personne, Collet, Communication avec les animaux, Couteau de glace, Création ou destruction d\'eau, Détection de la magie, Détection du poison et des maladies, Enchevêtrement, Grande foulée, Lien avec une bête, Lueurs féeriques, Mot de guérison, Soins, Nappe de brouillard, Purification de nourriture et d\'eau, Saut, Secousse sismique, Vague tonnante, Vents contraires'],
+        nombre_sort_niveau_un_classe="variable",
+        styles_de_combat=[],
+        argent_classe='2d4 x 10',
+        packs={'Pack (a)': ['Un bouclier de bois', 'Un cimeterre', 'Une armure de cuir', 'Un focaliseur druidique',  'Sac  d\'explorateur'],
+               'Pack (b)': ['Une arme courante au choix', 'Une arme courante de corps à corps au choix', 'Une armure de cuir', 'Un focaliseur druidique',  'Sac  d\'explorateur']},
+        dd_sauvegarde_sorts='8 + bonus de maîtrise + modificateur de Sagesse',
+        modificateur_attaque_sort='bonus de maîtrise + modificateur de Sagesse',
+        ca='10 + modificateur de Dextérité',
+        jets_de_sauvegarde='Intelligence, Sagesse',
+        pv=8
+    ),
+    'Ensorceleur': Classe(
+        nom='Ensorceleur',
+        description='Les ensorceleurs sont les porteurs d’une magie innée qui prend sa source dans un lignage exotique, une quelconque influence d\'Outremonde ou une exposition à une force cosmique inouïe. On ne peut pas étudier la sorcellerie comme on apprend un langage, pas plus qu’on ne peut apprendre à vivre une vie de légende. Personne ne choisit la sorcellerie ; le pouvoir choisit l’ensorceleur.',
+        details=[
+            'DV. 1d6',
+            'Armures. aucune',
+            'Armes. dague, fléchette, fronde, bâton, arbalète légère',
+            'Jets de sauvegarde. Constitution, Charisme',
+            'Choix de 2 compétences parmi Arcanes, Intimidation, Intuition, Persuasion, Religion et Tromperie'
+        ],
+        capacites=[
+            """
+'Incantation
+    Un événement dans votre passé, ou dans la vie d'un parent ou un ancêtre, vous a laissé une marque indélébile, en vous insufflant la magie des arcanes. Cette source de magie, quelle que soit son origine, alimente vos sorts.
+            """
+        ],
+        nombre_outils=0,
+        outils=[],
+        nombre_de_competence=2,
+        competences='Arcanes, Intimidation, Intuition, Persuasion, Tromperie, Religion',
+        sort_mineur_classe=['Amis', 'Aspersion d\'acide', 'Bouffée de poison', 'Contact glacial', 'Contôle des flammes', 'Coup au but', 'Façonnage de l\'eau', 'Façonnage de la terre', 'Ferrage foudroyant', 'Illusion mineure', 'Gelure', 'Lame aux flammes vertes', 'Infestation', 'Lame retentissante', 'Lumière', 'Lumières dansantes', 'Main de mage', 'Message', 'Piqûre mentale', 'Poigne électrique', 'Prestidigitation', 'Protection contre les armes', 'Rayon de givre', 'Réparation', 'Saute de vente', 'Trait de feu'],
+        nombre_sort_mineur_classe=4,
+        sort_niveau_un_classe=['Absorption des éléments', 'Armure de mage', 'Barbes argentées', 'Bouclier', 'Catapulte', 'Charme-personne', 'Compréhension des langues', 'Couleurs dansantes', 'Couteau de glace ', 'Déguisement', 'Détection de la magie', 'Éclair de chaos', 'Feuille morte', 'Image silencieuse', 'Mains brûlantes', 'Mixture caustique de Tasha', 'Nappe de brouillard', 'Orbe chromatique', 'Projectile élémentaire', 'Projectile magique', 'Rayon empoisonné', 'Repli expéditif', 'Saut', 'Secousse sismique', 'Simulacre de vie', 'Sommeil', 'Trait ensorcelé', 'Vague tonnante'],
+        nombre_sort_niveau_un_classe=2,
+        styles_de_combat=[],
+        argent_classe='3d4 x 10',
+        packs={'Pack (a)': ['Une arbalète légère et 20 carreaux', 'Une sacoche à composantes', 'Deux dagues', 'Sac  d\'explorateur'],
+               'Pack (b)': ['Une arme courante au choix', 'Un focaliseur arcanique', 'Deux dagues',  'Sac  d\'exploration souterraine']},
+        dd_sauvegarde_sorts='8 + bonus de maîtrise + modificateur de Charisme',
+        modificateur_attaque_sort='bonus de maîtrise + modificateur de Charisme',
+        ca='10 + modificateur de Dextérité',
+        jets_de_sauvegarde='Constitution, Charisme',
+        pv=6
+    ),
     'Guerrier': Classe(
         nom='Guerrier',
         description='Des combattants experts avec une variété d’armures et d’armes.',
@@ -866,9 +1059,13 @@ classes = {
             'Choix de 2 compétences parmi Acrobaties, Athlétisme, Dressage, Histoire, Intimidation, Intuition, Perception, Survie'
         ],
         capacites=[
-            'Second souffle: Une fois par repos court ou long, vous pouvez utiliser une action bonus pour regagner un nombre de points de vie égal à 1d10 + votre niveau.',
-            'Style de combat: Vous choisissez un style de combat qui vous accorde des avantages en combat.'
+            """
+Second souffle: Une fois par repos court ou long, vous pouvez utiliser une action bonus pour regagner un nombre de points de vie égal à 1d10 + votre niveau.
+
+Style de combat: Vous choisissez un style de combat qui vous accorde des avantages en combat.            
+            """
         ],
+        nombre_outils=1,
         outils=['Matériel de forgeron', 'Matériel de brasseur'],
         nombre_de_competence=2,
         competences='Acrobaties, Athlétisme, Dressage, Histoire, Intimidation, Intuition, Perception, Survie',
@@ -879,7 +1076,10 @@ classes = {
         styles_de_combat=styles_de_combat,
         argent_classe='5d4 x 10',
         packs={'Pack (a)': ['Cotte de mailles', 'Bouclier', '1 arme de guerre', 'Arbalète légère', 'Sac d\'exploration souterraine'],
-               'Pack (b)': ['Armure de cuir', '2 armes de guerre', '2 hachettes', 'Arc long', 'Sac d\'explorateur']}
+               'Pack (b)': ['Armure de cuir', '2 armes de guerre', '2 hachettes', 'Arc long', 'Sac d\'explorateur']},
+        ca='10 + modificateur de Dextérité',
+        jets_de_sauvegarde='Force, Constitution',
+        pv=10
     ),
     'Magicien': Classe(
         nom='Magicien',
@@ -888,23 +1088,106 @@ classes = {
             'DV. 1d6',
             'Armes. Dague, fléchette, fronde, bâton, arbalète légère',
             'Jets de sauvegarde. Intelligence, Sagesse',
-            'Choix de 2 compétences parmi Arcanes, Histoire, Intuition, Investigation, Médecine, Religion'
+            'Choix de 2 compétences parmi Arcanes, Histoire, Intuition, Investigation, Médecine et Religion'
         ],
         capacites=[
-            'Incantation: Vous pouvez lancer des sorts de votre liste de sorts.',
-            'Restauration arcanique (1/jour): Vous récupérez un nombre d’emplacements de sorts égal à [niv/2] (maximum niveau 5).'
+            """
+Sorts mineurs : Au niveau 1, vous connaissez trois sorts mineurs de magicien de votre choix. Vous apprendrez des sorts mineurs supplémentaires de votre choix aux niveaux supérieurs.
+Grimoire : Au niveau 1, vous possédez un grimoire qui contient six sorts de magicien de niveau 1 de votre choix. Votre grimoire est le gardien des sorts de magicien que vous connaissez, à exception des sorts mineurs qui sont eux fixés dans votre esprit.
+
+Préparer et lancer des sorts : Pour lancer un de ces sorts, vous devez dépenser un emplacement du niveau du sort ou supérieur, 2 aux niveau 1. Vous regagnez tous les emplacements de sorts dépensés lorsque vous terminez un repos long.
+Vous devez préparer la liste des sorts de magicien qui vous sont disponibles pour les lancer. Pour ce faire, choisissez dans votre grimoire un nombre de sorts de magicien égal à votre modificateur d'Intelligence + votre niveau de magicien (minimum un sort).
+
+Restauration arcanique : Vous avez appris à regagner une partie de votre énergie magique par l'étude de votre grimoire. Une fois par jour, lorsque vous terminez un repos court, vous pouvez choisir des emplacements de sorts dépensés à récupérer.
+            """
         ],
+        nombre_outils=0,
         outils=[],
         nombre_de_competence=2,
         competences='Arcanes, Histoire, Intuition, Investigation, Médecine, Religion',
-        sort_mineur_classe=sort_mineur,
+        sort_mineur_classe=['Amis, Aspersion d\'acide, Bouffée de poison, Contact glacial, Contôle des flammes, Coup au but, Façonnage de l\'eau, Façonnage de la terre, Ferrage foudroyant, Illusion mineure, Gelure, Lame aux flammes vertes, Infestation, Lame retentissante, Lumière, Lumières dansantes, Main de mage, Message, Piqûre mentale, Poigne électrique, Prestidigitation, Protection contre les armes, Rayon de givre, Réparation, Saute de vente, Trait de feu'],
         nombre_sort_mineur_classe=3,
-        sort_niveau_un_classe=sort_niveau_un,
+        sort_niveau_un_classe=['Absorption des éléments, Alarme, Appel de familier, Armure de mage, Barbes argentées, Bouclier, Compréhension des langues, Couleurs dansantes, Couteau de glace, Déguisement, Détection de la magie, Disque flottant de Tenser, Feuille morte, Fou rire de Tasha, Frayeur, Graisse, Grande foulée, Identification, Image silencieuse, Mains brûlantes, Orbe chromatique, Projectile magique, Protection contre le mal et le bien, Rayon empoisonné, Repli expéditif, Saut, Secousse sismique, Serviteur invisible, Sommeil, Texte illusoire, Trait ensorcelé, Vague tonnante, Vents contraires, Éclair de chaos, Mixture caustique de Tasha, Nappe de brouillard, Projectile élémentaire, Simulacre de vie'],
         nombre_sort_niveau_un_classe=6,
         styles_de_combat=[],
         argent_classe='5d4 x 10',
         packs={'Pack (a)': ['Bâton', 'Grimoire', 'Sacoche à composantes', 'Sac d\'érudit'],
-               'Pack (b)': ['Dague', 'Grimoire', 'Focalisateur arcanique', 'Sac d\'explorateur']}
+               'Pack (b)': ['Dague', 'Grimoire', 'Focalisateur arcanique', 'Sac d\'explorateur']},
+        dd_sauvegarde_sorts='8 + bonus de maîtrise + modificateur d\'Intelligence',
+        modificateur_attaque_sort='bonus de maîtrise + modificateur d\'Intelligence',        
+        ca='10 + modificateur de Dextérité',
+        jets_de_sauvegarde='Intelligence, Sagesse',
+        pv=6
+    ),
+    'Moine': Classe(
+        nom='Moine',
+        description='Quelle que soit leur discipline, les moines sont unis dans leur aptitude à exploiter magiquement l\'énergie qui parcourt leur corps. Canalisée en une remarquable démonstration de prouesse martiale ou en une subtile augmentation de capacité défensive et de vitesse, cette énergie imprègne tout ce que fait le moine.',
+        details=[
+            'DV. 1d8',
+            'Armes. armes courantes, épée courte',
+            'Jets de sauvegarde. Intelligence, Sagesse',
+            'Choix de 2 compétences parmi Acrobaties, Athlétisme, Discrétion, Histoire, Intuition et Religion'
+        ],
+        capacites=[
+            """
+Défense sans armure : Tant que vous n'êtes équipé ni d'une armure, ni d'un bouclier, votre CA est égale à 10 + votre modificateur de Dextérité + votre modificateur de Sagesse.
+
+Arts martiaux : Votre pratique des arts martiaux vous donne la maîtrise des styles de combat utilisant les attaques à mains nues et les armes de moine, qui sont l'épée courte et toutes les armes de corps à corps courantes qui n'ont ni la propriété à deux mains, ni la propriété lourde. Vous gagnez les avantages suivants lorsque vous êtes à mains nues ou ne maniez que des armes de moine et que vous n'êtes équipé ni d'armure ni de bouclier :
+    Vous pouvez utiliser la Dextérité à la place de la Force aux jets d'attaque et de dégâts de vos attaques à mains nues et avec des armes de moine.
+    Vous pouvez lancer un d4 à la place des dégâts normaux de votre attaque à mains nues ou de vos armes de moine. Ce dé change lorsque vous gagnez des niveaux de moine.
+    Lorsque vous utilisez l'action Attaquer avec une attaque à mains nues ou une arme de moine au cours de votre tour, vous pouvez effectuer une attaque à mains nues au prix d'une action bonus. Par exemple, si vous prenez l'action Attaque et attaquez avec un bâton, vous pouvez également effectuer une attaque à mains nues avec votre action bonus, à condition que vous n'ayez pas déjà utilisé votre action bonus pour ce tour.'
+            """
+        ],
+        nombre_outils=1,
+        outils='Chalemie, Cor, Cornemuse, Flûte,  Flûte de pan, Luth, Lyre, Tambour, Tympanon, Viole, Matériel d\'alchimie, Matériel de brasseur, Matériel de calligraphe, Matériel de peintre, Matériel de bijoutier, Matériel de bricoleur, Matériel de cuisinier, Matériel de tisserand, Matériel de tanneur, Matériel de souffleur de verre, Matériel de potier, Matériel de menuisier, Matériel de bricoleur, Matériel de cartographe, Matériel de charpentier, Matériel de cordonnier, Matériel de forgeron, Matériel de maçon,',
+        nombre_de_competence=2,
+        competences='Acrobaties, Athlétisme, Discrétion, Histoire, Intuition, Religion',
+        sort_mineur_classe=[],
+        nombre_sort_mineur_classe=0,
+        sort_niveau_un_classe=[],
+        nombre_sort_niveau_un_classe=0,
+        styles_de_combat=[],
+        argent_classe='5d4 x 10',
+        packs={'Pack (a)': ['Une épée courte', '10 fléchettes',  'Sac d\'exploration souterraine'],
+               'Pack (b)': ['Une arme courante au choix', '10 fléchettes',  'Sac  d\'explorateur']},      
+        ca='10 + modificateur de Dextérité + modificateur de Sagesse',
+        jets_de_sauvegarde='Force, Dextérité',
+        pv=8
+    ),
+    'Occultiste': Classe(
+        nom='Occultiste',
+        description='Les occultistes sont des chercheurs de la connaissance dissimulée dans la trame du multivers. Par l’entremise de pactes conclus avec de mystérieux êtres dotés de pouvoirs surnaturels, les occultistes libèrent des effets magiques à la fois subtiles et spectaculaires. Tirant parti du savoir ancien d’êtres tels que les nobles fées, les démons, les diables, les sorcières et les entités extraplanaires du Royaume lointain, les occultistes assemblent les secrets arcaniques pour renforcer leur propre puissance.',
+        details=[
+            'DV. 1d8',
+            'Armures. Armures légères',
+            'Armes. Armes courantes',
+            'Jets de sauvegarde. Sagesse, Charisme',
+            'Choix de 2 compétences parmi Arcanes, Histoire, Intimidation, Investigation, Nature, Tromperie et Religion'
+        ],
+        capacites=[
+            """
+Patron d'Outremonde : Vous avez conclu un marché avec un être d'Outremonde de votre choix : l'Archifée, le Fiélon ou le Grand Ancien.
+Manifestations occultes : Fragments d’un savoir interdit vous conférant une capacité magique permanente.
+Magie de pacte : Pour lancer un sort d'occultiste de niveau 1 ou supérieur, vous devez dépenser un emplacement. Vous regagnez tous vos emplacements de sorts dépensés lorsque vous terminez un repos court ou long.
+            """
+        ],
+        nombre_outils=0,
+        outils=[],
+        nombre_de_competence=2,
+        competences='Arcanes, Histoire, Intuition, Investigation, Médecine, Religion',
+        sort_mineur_classe=['Amis, Aspersion d\'acide, Bouffée de poison, Contact glacial, Contôle des flammes, Coup au but, Façonnage de l\'eau, Façonnage de la terre, Ferrage foudroyant, Illusion mineure, Gelure, Lame aux flammes vertes, Infestation, Lame retentissante, Lumière, Lumières dansantes, Main de mage, Message, Piqûre mentale, Poigne électrique, Prestidigitation, Protection contre les armes, Rayon de givre, Réparation, Saute de vente, Trait de feu'],
+        nombre_sort_mineur_classe=3,
+        sort_niveau_un_classe=['Absorption des éléments, Alarme, Appel de familier, Armure de mage, Barbes argentées, Bouclier, Compréhension des langues, Couleurs dansantes, Couteau de glace, Déguisement, Détection de la magie, Disque flottant de Tenser, Feuille morte, Fou rire de Tasha, Frayeur, Graisse, Grande foulée, Identification, Image silencieuse, Mains brûlantes, Orbe chromatique, Projectile magique, Protection contre le mal et le bien, Rayon empoisonné, Repli expéditif, Saut, Secousse sismique, Serviteur invisible, Sommeil, Texte illusoire, Trait ensorcelé, Vague tonnante, Vents contraires, Éclair de chaos, Mixture caustique de Tasha, Nappe de brouillard, Projectile élémentaire, Simulacre de vie'],
+        nombre_sort_niveau_un_classe=6,
+        styles_de_combat=[],
+        argent_classe='5d4 x 10',
+        packs={'Pack (a)': ['Bâton', 'Grimoire', 'Sacoche à composantes', 'Sac d\'érudit'],
+               'Pack (b)': ['Dague', 'Grimoire', 'Focalisateur arcanique', 'Sac d\'explorateur']},
+        dd_sauvegarde_sorts='8 + bonus de maîtrise + modificateur d\'Intelligence',
+        modificateur_attaque_sort='bonus de maîtrise + modificateur d\'Intelligence',        
+        ca='10 + modificateur de Dextérité',
+        jets_de_sauvegarde='Intelligence, Sagesse',
+        pv=6
     ),
     'Roublard': Classe(
         nom='Roublard',
@@ -922,6 +1205,7 @@ classes = {
             'Attaque sournoise: Une fois par tour, vous pouvez infliger des dégâts supplémentaires à une cible que vous attaquez avec une arme de finesse ou à distance si vous avez l’avantage à l\'attaque ou si un allié est à portée de mêlée de la cible.',
             'Jargon des voleurs: Vous pouvez comprendre et parler le jargon des voleurs, un langage secret utilisé par les criminels.'
         ],
+        nombre_outils=1,
         outils=['Outils de voleur'],
         nombre_de_competence=4,
         competences='Acrobaties, Athlétisme, Discrétion, Escamotage, Intimidation, Intuition, Investigation, Perception, Persuasion, Représentation, Tromperie',
@@ -1409,6 +1693,13 @@ classe_combobox.pack(anchor="w", pady=5)
 classe_details_label = tk.Label(onglet_classe, text="", wraplength=700, justify="left")
 classe_details_label.pack(anchor="w", pady=10)
 
+# --- Ajout des labels pour les sorts et capacités de l'Occultiste ---
+sort_details_label = tk.Label(onglet_classe, text="", wraplength=700, justify="left")
+sort_details_label.pack(anchor="w", pady=10)
+
+capacites_details_label = tk.Label(onglet_classe, text="", wraplength=700, justify="left")
+capacites_details_label.pack(anchor="w", pady=10)
+
 # Frame pour la sélection de race
 frame_race_selection = tk.Frame(onglet_race)
 frame_race_selection.pack(anchor="w", pady=10)
@@ -1454,7 +1745,7 @@ classe_combobox.bind("<<ComboboxSelected>>", lambda event: [
     personnage.reset_comboboxes(),
     afficher_details_classe(),
     personnage.update_display(),
-    personnage.update_maitrise(),  # Réinitialise l'onglet Maîtrise
+    personnage.update_maitrise(),# Réinitialise l'onglet Maîtrise
     update_options()
 ])
 
@@ -1674,15 +1965,130 @@ table_frame = None
 
 # Fonctions pour afficher les détails de la classe
 def afficher_details_classe():
-    classe_selectionnee = classe_combobox.get()
-    if classe_selectionnee:
-        description = classes[classe_selectionnee].description
-        details = classes[classe_selectionnee].details
-        capacites = classes[classe_selectionnee].capacites
-        details_str = '\n'.join(details)
-        capacites_str = '\n'.join(capacites)
-        classe_details_label.config(text=f'Description:\n{description}\n\nDétails de la Classe:\n{details_str}\n\nCapacités de la Classe:\n{capacites_str}')
+    global patron_label, patron_combobox, tableau_frame
+    
+    # Réinitialiser les éléments spécifiques à l'Occultiste (ou à toute autre classe)
+    if patron_label:
+        patron_label.pack_forget()
+        patron_label = None
+    if patron_combobox:
+        patron_combobox.pack_forget()
+        patron_combobox = None
+    if tableau_frame:
+        tableau_frame.destroy()
+        tableau_frame = None
 
+    # Récupérer la classe sélectionnée
+    classe_selectionnee = classe_combobox.get()
+
+    if classe_selectionnee:
+        classe_info = classes[classe_selectionnee]
+
+        # Afficher la description et les détails de la classe
+        description = classe_info.description
+        details = '\n'.join(classe_info.details)
+        
+        # Capacités de base à afficher par défaut
+        capacites_base = '\n'.join(classe_info.capacites)
+        
+        # Affichage des informations de la classe
+        classe_details_label.config(text=f"Description:\n{description}\n\nDétails de la Classe:\n{details}\n\nCapacités de la Classe:\n{capacites_base}")
+
+        # Si la classe sélectionnée est "Occultiste", afficher le menu déroulant et le tableau
+        if classe_selectionnee == 'Occultiste':
+            # Ajouter le titre pour le choix du patron
+            patron_label = tk.Label(onglet_classe, text="Choisissez votre patron :", font=('Arial', 12, 'bold'))
+            patron_label.pack(anchor="center", pady=10)
+
+            # Créer un menu déroulant pour sélectionner le patron
+            patron_combobox = ttk.Combobox(onglet_classe, values=["L'Archifée", "Le Fiélon", "Le Grand Ancien"], state="readonly")
+            patron_combobox.pack(anchor="center", padx=5, pady=5)
+
+            # Bind le combobox pour mettre à jour les sorts et capacités en fonction du patron sélectionné
+            patron_combobox.bind("<<ComboboxSelected>>", lambda event: update_patron(patron_combobox.get()))
+
+            # Afficher le tableau des patrons
+            afficher_tableau_patrons()
+
+# Variables globales pour les éléments spécifiques à l'Occultiste
+patron_label = None
+patron_combobox = None
+tableau_frame = None
+
+def afficher_tableau_patrons():
+    global tableau_frame
+    
+    # Créer le frame qui contiendra le tableau
+    tableau_frame = tk.Frame(onglet_classe)
+    tableau_frame.pack(pady=10)
+
+    # Créer un tableau avec Treeview
+    colonnes = ("Patron", "Sorts conférés", "Capacité conférée")
+    tableau = ttk.Treeview(tableau_frame, columns=colonnes, show='headings', height=3)
+
+    # Configurer les en-têtes du tableau
+    tableau.heading("Patron", text="Patron")
+    tableau.heading("Sorts conférés", text="Sorts conférés")
+    tableau.heading("Capacité conférée", text="Capacité conférée")
+
+    # Définir la largeur des colonnes
+    tableau.column("Patron", width=150, anchor="center")
+    tableau.column("Sorts conférés", width=200, anchor="center")
+    tableau.column("Capacité conférée", width=300, anchor="center")
+
+    # Ajouter les données des patrons
+    data = [
+        ("L'Archifée", "Lueurs féeriques, Sommeil", "Présence féerique"),
+        ("Le Fiélon", "Injonction, Mains brûlantes", "Bénédiction du ténébreux"),
+        ("Le Grand Ancien", "Fou rire de Tasha, Murmures dissonants", "Esprit éveillé")
+    ]
+
+    # Insérer les lignes de données dans le tableau
+    for row in data:
+        tableau.insert('', tk.END, values=row)
+
+    # Afficher le tableau
+    tableau.pack(fill="both", expand=True)
+
+def update_patron(patron_choisi):
+    # Sorts de base avant ajout du patron
+    sorts_base = ['Absorption des éléments, Alarme, Appel de familier, Armure de mage, Barbes argentées, Bouclier, Compréhension des langues, Couleurs dansantes, Couteau de glace, Déguisement, Détection de la magie, Disque flottant de Tenser, Feuille morte, Fou rire de Tasha, Frayeur, Graisse, Grande foulée, Identification, Image silencieuse, Mains brûlantes, Orbe chromatique, Projectile magique, Protection contre le mal et le bien, Rayon empoisonné, Repli expéditif, Saut, Secousse sismique, Serviteur invisible, Sommeil, Texte illusoire, Trait ensorcelé, Vague tonnante, Vents contraires, Éclair de chaos, Mixture caustique de Tasha, Nappe de brouillard, Projectile élémentaire, Simulacre de vie']
+    
+    #Description + detail occultiste
+    classe_occultiste = classes['Occultiste']
+    description = classe_occultiste.description
+    details = '\n'.join(classe_occultiste.details)
+    # Capacités de base sans patron
+    capacites_base = """
+Patron d'Outremonde : Vous avez conclu un marché avec un être d'Outremonde de votre choix : l'Archifée, le Fiélon ou le Grand Ancien.
+Manifestations occultes : Fragments d’un savoir interdit vous conférant une capacité magique permanente.
+Magie de pacte : Pour lancer un sort d'occultiste de niveau 1 ou supérieur, vous devez dépenser un emplacement. Vous regagnez tous vos emplacements de sorts dépensés lorsque vous terminez un repos court ou long.
+    """
+
+    # Initialiser les sorts et capacités en fonction du patron choisi
+    if patron_choisi == "L'Archifée":
+        sorts_patron = ['Lueurs féeriques', 'Sommeil']
+        capacites_patron = "Présence féerique : votre patron vous permet de projeter la séduisante présence des fées. Par une action, vous pouvez charmer ou effrayer des créatures dans un cube de 3 mètres après un jet de Sagesse raté."
+    elif patron_choisi == "Le Fiélon":
+        sorts_patron = ['Injonction', 'Mains brûlantes']
+        capacites_patron = "Bénédiction du ténébreux : Lorsque vous réduisez une créature hostile à 0 point de vie, vous gagnez des points de vie temporaires égaux à votre modificateur de Charisme + niveau d'occultiste."
+    elif patron_choisi == "Le Grand Ancien":
+        sorts_patron = ['Fou rire de Tasha', 'Murmures dissonants']
+        capacites_patron = "Esprit éveillé : Communiquer télépathiquement avec toute créature visible à 9 mètres."
+
+    # Mettre à jour les capacités et sorts dans l'objet personnage
+    personnage.sort_niveau_un_classe = sorts_base + sorts_patron
+    personnage.capacites = capacites_base + "\n" + capacites_patron
+
+    # Mettre à jour seulement les capacités affichées, sans dupliquer tout le contenu
+    classe_details_label.config(text=f"Description:\n{description}\n\nDétails de la Classe:\n{details}\n\nCapacités de la Classe:\n{capacites_base}\n{capacites_patron}")
+    
+
+
+def update_display_sorts_et_capacites():
+    # Mettre à jour l'affichage pour montrer les sorts et capacités modifiés
+    sort_details_label = personnage.sort_niveau_un_classe
+    capacites_details_label.config(text=f"Capacités : {personnage.capacites}")
 
 
 # Variables globales pour les éléments spécifiques à Drakéide
